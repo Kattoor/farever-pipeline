@@ -1,0 +1,21 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+---
+<BaseLayout title="Gatherables">
+    <div class="card">
+        <div class="hero">
+            <div>
+                <h1 data-pagefind-meta="title">Gatherables</h1>
+                <div class="muted">From <code>public/generated/data/gatherable.json</code></div>
+            </div>
+            <div class="toolbar">
+                <input id="g-search" type="search" placeholder="Search id / name / hitLoot…" />
+                <span id="g-count" class="pill muted">Loading…</span>
+            </div>
+        </div>
+        <div id="g-table"></div>
+    </div>
+    <script>
+        import "../../scripts/gatherables-table";
+    </script>
+</BaseLayout>

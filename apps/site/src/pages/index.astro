@@ -1,0 +1,24 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+const BASE = import.meta.env.BASE_URL;
+const withBase = (p) => BASE + String(p).replace(/^\/+/, "");
+---
+<BaseLayout title="Game DB">
+  <div class="card">
+    <h1 style="margin-top:0;">Farever DB</h1>
+    <p class="muted">Browse datamined content.</p>
+    <div class="toolbar" style="margin-top: 0.75rem;">
+      <a class="pill" href={withBase("items/")}>Items</a>
+      <a class="pill" href={withBase("units/")}>Units</a>
+      <a class="pill" href={withBase("loot-tables/")}>Loot Tables</a>
+      <a class="pill" href={withBase("gatherables/")}>Gatherables</a>
+      <a class="pill" href={withBase("crafts/")}>Crafts</a>
+      <a class="pill" href={withBase("jobs/")}>Jobs</a>
+      <a class="pill" href={withBase("skills/")}>Skills</a>
+      <a class="pill" href={withBase("attributes/")}>Attributes</a>
+      <a class="pill" href={withBase("map/")}>Map</a>
+      <a class="pill" href={withBase("models/")}>Models</a>
+      <a class="pill" href={withBase("search/")}>Search</a>
+    </div>
+  </div>
+</BaseLayout>

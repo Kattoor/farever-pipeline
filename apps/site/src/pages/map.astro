@@ -1,0 +1,29 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout title="World Map" wide={true}>
+  <div class="card map-page" id="world-map-root" data-world-id="w1-siagarta">
+    <div class="hero map-hero">
+      <div>
+        <h1 data-pagefind-meta="title">World Map</h1>
+        <div class="muted">Pan, zoom, hover, and click points of interest.</div>
+      </div>
+      <div class="toolbar map-toolbar">
+        <input id="map-search" type="search" placeholder="Search by name, unit id, type…" />
+        <span id="map-status" class="pill muted">Loading…</span>
+      </div>
+    </div>
+
+    <div id="map-type-filters" class="toolbar map-filters"></div>
+
+    <div class="map-shell">
+      <div id="world-map" class="map-canvas" aria-label="Interactive world map"></div>
+      <aside id="map-info" class="map-sidebar"></aside>
+    </div>
+  </div>
+
+  <script>
+    import "../scripts/world-map";
+  </script>
+</BaseLayout>

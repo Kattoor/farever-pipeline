@@ -1,0 +1,65 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { url, icon } from "../../lib/urls";
+import { readPublicJson } from "../../lib/data";
+
+export async function getStaticPaths() {
+    const jobs = await readPublicJson<any[]>("data/jobs.json");
+    const crafts = await readPublicJson<any[]>("data/craft.json");
+
+    const craftsByJob = new Map<string, any[]>();
+    for (const c of crafts) {
+        const j = String(c.job);
+        (craftsByJob.get(j) ?? craftsByJob.set(j, []).get(j)!).push(c);
+    }
+    for (const [k, arr] of craftsByJob) arr.sort((a, b) => String(a.item).localeCompare(String(b.item)));
+
+    return jobs.map((j) => ({
+        params: { id: String(j.id) },
+        props: { job: j, crafts: craftsByJob.get(String(j.id)) ?? [] },
+    }));
+}
+
+const { job, crafts } = Astro.props;
+const name = job?.texts?.name ?? job.id;
+const iconUrl = icon(job?.gfx?.file ?? null);
+---
+
+<BaseLayout title={`Job: ${name}`}>
+    <div class="card">
+        <div class="toolbar" style="justify-content: space-between; margin-bottom: 0.75rem;">
+            <a class="pill" href={url("jobs/")}>← Back to Jobs</a>
+            <span class="pill muted">ID: <code>{job.id}</code></span>
+        </div>
+
+        <div class="hero" style="align-items:center;">
+            <div class="toolbar" style="gap: 1rem;">
+                {iconUrl ? <img class="icon" src={iconUrl} width="56" height="56" alt={name} /> : null}
+                <div>
+                    <h1 style="margin:0;" data-pagefind-meta="title">{name}</h1>
+                    <div class="muted">Tool: <code>{job.toolType ?? "—"}</code></div>
+                </div>
+            </div>
+        </div>
+
+        {job?.texts?.desc ? <p style="white-space: pre-line;">{job.texts.desc}</p> : null}
+
+        <div class="card" style="margin-top: 1rem;">
+            <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">Crafts</h2>
+            {crafts.length ? (
+                    <ul style="margin:0; padding-left:1.25rem;">
+                        {crafts.slice(0, 120).map((c) => (
+                                <li>
+                                    <div class="drop-row">
+                                    <a href={url(`crafts/${encodeURIComponent(String(c.item))}/`)}><code>{c.item}</code></a>
+                                    {" "}• lvl <code>{c.level}</code>
+                                    {c.unlockSource ? <> • unlock <code>{c.unlockSource}</code></> : null}
+                                    </div>
+                                </li>
+                        ))}
+                        {crafts.length > 120 ? <li class="muted"><div class="drop-row">+{crafts.length - 120} more…</div></li> : null}
+                    </ul>
+            ) : <div class="muted">No crafts found for this job.</div>}
+        </div>
+    </div>
+</BaseLayout>

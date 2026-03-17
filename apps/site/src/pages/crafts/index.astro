@@ -1,0 +1,21 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+---
+<BaseLayout title="Crafts">
+    <div class="card">
+        <div class="hero">
+            <div>
+                <h1 data-pagefind-meta="title">Crafts</h1>
+                <div class="muted">From <code>public/generated/data/craft.json</code></div>
+            </div>
+            <div class="toolbar">
+                <input id="c-search" type="search" placeholder="Search output / ingredient / job…" />
+                <span id="c-count" class="pill muted">Loading…</span>
+            </div>
+        </div>
+        <div id="c-table"></div>
+    </div>
+    <script>
+        import "../../scripts/crafts-table";
+    </script>
+</BaseLayout>

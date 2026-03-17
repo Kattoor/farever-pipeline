@@ -1,0 +1,483 @@
+@import "tabulator-tables/dist/css/tabulator_site_dark.min.css";
+
+:root {
+    color-scheme: dark light;
+    --bg: rgba(127, 127, 127, 0.08);
+    --border: rgba(127, 127, 127, 0.22);
+    --muted: rgba(127, 127, 127, 0.9);
+
+    /* Dark surface palette */
+    --surface-0: rgba(0, 0, 0, 0.35); /* page background tint */
+    --surface-1: rgba(0, 0, 0, 0.22); /* headers / top bars */
+    --surface-2: rgba(0, 0, 0, 0.14); /* table body */
+    --surface-3: rgba(255, 255, 255, 0.04); /* subtle row alt */
+    --surface-hover: rgba(255, 255, 255, 0.07);
+    --surface-selected: rgba(255, 255, 255, 0.10);
+}
+
+body {
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    margin: 0;
+    line-height: 1.45;
+    background: var(--surface-0);
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+a:hover {
+    text-decoration: underline;
+}
+
+code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", monospace;
+    font-size: 0.95em;
+}
+
+.container {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 1.25rem;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin: 1.25rem 0;
+}
+
+.nav {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.brand {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    font-weight: 750;
+    letter-spacing: 0.2px;
+}
+
+.card {
+    border: 1px solid var(--border);
+    background: var(--bg);
+    border-radius: 16px;
+    padding: 1rem;
+    backdrop-filter: blur(6px);
+}
+
+.hero {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+}
+
+.hero h1 {
+    margin: 0;
+    font-size: 1.55rem;
+}
+
+.muted {
+    opacity: 0.82;
+}
+
+.toolbar {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+input[type="search"] {
+    padding: 0.6rem 0.75rem;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: rgba(0, 0, 0, 0.12);
+    color: inherit;
+    min-width: 280px;
+}
+
+input[type="search"]::placeholder {
+    color: rgba(255, 255, 255, 0.45);
+}
+
+.pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.35rem 0.6rem;
+    font-size: 0.9rem;
+}
+
+.icon {
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: rgba(127, 127, 127, 0.10);
+}
+
+.desc-preview {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0.85;
+    max-width: 640px;
+}
+
+/* ---------- Tooltip ---------- */
+.tip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.tip::after {
+    content: attr(data-tip);
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: calc(100% + 10px);
+    background: rgba(0, 0, 0, 0.88);
+    color: white;
+    padding: 0.35rem 0.55rem;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.12s ease;
+    z-index: 9999;
+    max-width: 340px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tip::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: calc(100% + 2px);
+    border: 7px solid transparent;
+    border-top-color: rgba(0, 0, 0, 0.88);
+    opacity: 0;
+    transition: opacity 0.12s ease;
+    z-index: 9999;
+}
+
+.tip:hover::after,
+.tip:hover::before {
+    opacity: 1;
+}
+
+.item-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.item-chip img {
+    width: 22px;
+    height: 22px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: rgba(127, 127, 127, 0.10);
+}
+
+/* Optional: make Tabulator match the site's card border/radius */
+.tabulator {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+/* Fix inline <code> baseline "floating" */
+code {
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+    line-height: 1;
+    padding: 0.12em 0.35em;
+    border-radius: 10px;
+}
+
+/* Keep pills + chips aligned */
+.pill,
+.item-chip,
+.tip {
+    align-items: center;
+}
+
+.item-chip img {
+    display: block;
+}
+
+/* Let selected Tabulator cells wrap instead of ellipsizing */
+.tabulator .tabulator-cell.cell-wrap {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+}
+
+/* Chip rows inside those cells */
+.chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    align-items: center;
+}
+
+/* Percent/meta text inside chips/pills */
+.chip-meta {
+    opacity: 0.8;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.9em;
+}
+
+/* Make pills/chips/code align consistently */
+.pill,
+.item-chip,
+.tip {
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+}
+
+code {
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+    vertical-align: middle;
+    padding: 0.12em 0.35em;
+    border-radius: 10px;
+}
+
+.item-chip img {
+    display: block;
+}
+
+.drop-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+/* Global fix: inline <code> shouldn't mess with vertical alignment */
+code {
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+
+    line-height: 1;
+    padding: 0.12em 0.35em;
+    border-radius: 10px;
+
+    /* optional: keeps it from looking too tall */
+    font-size: 0.92em;
+}
+
+/* Ensure inline UI elements align consistently */
+.pill,
+.item-chip,
+.tip {
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+    line-height: 1;
+}
+
+/* Helps image baselines too */
+.item-chip img,
+.icon {
+    display: block;
+}
+
+.container-wide {
+    max-width: min(1600px, calc(100vw - 2rem));
+}
+
+.map-page {
+    display: grid;
+    gap: 1rem;
+}
+
+.map-hero {
+    margin-bottom: 0;
+}
+
+.map-toolbar {
+    justify-content: flex-end;
+}
+
+.map-filters {
+    gap: 0.55rem;
+}
+
+.map-filter-pill {
+    gap: 0.45rem;
+    cursor: pointer;
+}
+
+.map-filter-pill input {
+    margin: 0;
+}
+
+.map-swatch {
+    width: 0.7rem;
+    height: 0.7rem;
+    border-radius: 999px;
+    background: var(--swatch, rgba(255,255,255,0.8));
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.45) inset;
+}
+
+.map-shell {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 1rem;
+    align-items: start;
+}
+
+.map-canvas {
+    height: 78vh;
+    min-height: 600px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.12) !important;
+}
+
+.map-sidebar {
+    min-height: 260px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: rgba(0, 0, 0, 0.12);
+    padding: 1rem;
+    overflow: auto;
+    max-height: 78vh;
+}
+
+.map-side-card h2 {
+    margin: 0.15rem 0 0.75rem;
+    font-size: 1.15rem;
+}
+
+.map-side-kicker {
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    opacity: 0.75;
+}
+
+.map-kv {
+    display: grid;
+    gap: 0.65rem;
+    margin: 0;
+}
+
+.map-kv div {
+    display: grid;
+    gap: 0.15rem;
+}
+
+.map-kv dt {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.7;
+}
+
+.map-kv dd {
+    margin: 0;
+}
+
+.map-raw-details {
+    margin-top: 0.9rem;
+}
+
+.map-raw-details pre {
+    margin: 0.6rem 0 0;
+    padding: 0.75rem;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.25);
+    overflow: auto;
+    font-size: 0.82rem;
+}
+
+.leaflet-container {
+    font: inherit;
+    background: transparent !important;
+}
+
+.leaflet-pane,
+.leaflet-map-pane,
+.leaflet-tile-pane {
+    background: transparent !important;
+}
+
+.leaflet-tooltip {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.88);
+    color: white;
+    box-shadow: none;
+    padding: 0.35rem 0.55rem;
+}
+
+.leaflet-tooltip-top:before {
+    border-top-color: rgba(0, 0, 0, 0.88);
+}
+
+@media (max-width: 1100px) {
+    .map-shell {
+        grid-template-columns: 1fr;
+    }
+
+    .map-sidebar {
+        max-height: none;
+    }
+
+    .map-canvas {
+        height: 68vh;
+        min-height: 480px;
+    }
+}
+
+.map-side-actions {
+    margin: 0.75rem 0 1rem 0;
+}
+
+.map-action-link {
+    text-decoration: none;
+}
+
+.map-side-hero {
+    margin: 0.75rem 0 1rem 0;
+    display: flex;
+    justify-content: center;
+}
+
+.map-side-icon {
+    width: 72px;
+    height: 72px;
+    object-fit: contain;
+    image-rendering: auto;
+}
+
+.map-side-actions {
+    margin: 0.75rem 0 1rem 0;
+}
+
+.map-action-link {
+    text-decoration: none;
+}

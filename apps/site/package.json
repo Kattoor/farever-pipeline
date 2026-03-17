@@ -1,0 +1,22 @@
+{
+  "name": "@farever/site",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "postbuild": "pagefind --site dist",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "astro": "^5.17.1",
+    "leaflet": "^1.9.4",
+    "tabulator-tables": "^6.3.1"
+  },
+  "devDependencies": {
+    "@types/leaflet": "^1.9.21",
+    "@types/tabulator-tables": "^6.3.1",
+    "pagefind": "^1.4.0"
+  }
+}

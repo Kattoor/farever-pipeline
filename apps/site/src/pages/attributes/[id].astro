@@ -1,0 +1,132 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { url, icon } from "../../lib/urls";
+import { readPublicJson, buildIndex } from "../../lib/data";
+
+export async function getStaticPaths() {
+    const [attrs, skills, items, units] = await Promise.all([
+        readPublicJson<any[]>("data/attributes.json"),
+        readPublicJson<any[]>("data/skills.json"),
+        readPublicJson<any[]>("data/items.json"),
+        readPublicJson<any[]>("data/units.json"),
+    ]);
+
+    const attrById = buildIndex(attrs);
+
+    const skillsByAttr = new Map<string, any[]>();
+    for (const s of skills) {
+        for (const a of s?.affixes ?? []) {
+            const atb = a?.target?.attribute;
+            if (!atb) continue;
+            const id = String(atb);
+            (skillsByAttr.get(id) ?? skillsByAttr.set(id, []).get(id)!).push({
+                id: String(s.id),
+                name: s?.texts?.name ?? null,
+                gfxFile: s?.gfx?.file ?? null,
+            });
+        }
+    }
+
+    const itemsByAttr = new Map<string, any[]>();
+    for (const it of items) {
+        for (const af of it?.affixes ?? []) {
+            const atb = af?.target?.attribute;
+            if (!atb) continue;
+            const id = String(atb);
+            (itemsByAttr.get(id) ?? itemsByAttr.set(id, []).get(id)!).push({
+                id: String(it.id),
+                name: it?.texts?.name ?? null,
+                gfxFile: it?.gfx?.file ?? null,
+            });
+        }
+    }
+
+    const unitsByAttr = new Map<string, any[]>();
+    for (const u of units) {
+        for (const st of u?.stats ?? []) {
+            const atb = st?.attribute;
+            if (!atb) continue;
+            const id = String(atb);
+            (unitsByAttr.get(id) ?? unitsByAttr.set(id, []).get(id)!).push({
+                id: String(u.id),
+                name: u?.texts?.name ?? u?.name ?? null,
+                lvl: u?.lvl ?? null,
+                maxLvl: u?.maxLvl ?? null,
+            });
+        }
+    }
+
+    return attrs.map((a) => ({
+        params: { id: String(a.id) },
+        props: {
+            attr: a,
+            skills: skillsByAttr.get(String(a.id)) ?? [],
+            items: itemsByAttr.get(String(a.id)) ?? [],
+            units: unitsByAttr.get(String(a.id)) ?? [],
+        },
+    }));
+}
+
+const { attr, skills, items, units } = Astro.props;
+const iconUrl = attr?.gfx?.file ? icon(attr.gfx.file) : null;
+---
+
+<BaseLayout title={`Attribute: ${attr.name ?? attr.id}`}>
+    <div class="card">
+        <div class="toolbar" style="justify-content: space-between; margin-bottom: 0.75rem;">
+            <a class="pill" href={url("attributes/")}>← Back to Attributes</a>
+            <span class="pill muted">ID: <code>{attr.id}</code></span>
+        </div>
+
+        <div class="hero" style="align-items:center;">
+            <div class="toolbar" style="gap: 1rem;">
+                {iconUrl ? <img class="icon" src={iconUrl} width="56" height="56" alt={attr.name ?? attr.id} /> : null}
+                <div>
+                    <h1 style="margin:0;" data-pagefind-meta="title">{attr.name ?? attr.id}</h1>
+                    {attr.desc ? <div class="muted" style="margin-top:.25rem;">{attr.desc}</div> : null}
+                </div>
+            </div>
+        </div>
+
+        <div style="display:grid; gap:.75rem; margin-top:1rem;">
+            <div class="card">
+                <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">Skills affecting this attribute</h2>
+                {skills.length ? (
+                        <div class="toolbar">
+                            {skills.slice(0, 80).map((s) => (
+                                    <a class="pill" href={url(`skills/${encodeURIComponent(s.id)}/`)}><code>{s.id}</code></a>
+                            ))}
+                            {skills.length > 80 ? <span class="muted">+{skills.length - 80} more…</span> : null}
+                        </div>
+                ) : <div class="muted">None.</div>}
+            </div>
+
+            <div class="card">
+                <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">Items with this attribute</h2>
+                {items.length ? (
+                        <div class="toolbar">
+                            {items.slice(0, 80).map((it) => (
+                                    <a class="pill" href={url(`items/${encodeURIComponent(it.id)}/`)}><code>{it.id}</code></a>
+                            ))}
+                            {items.length > 80 ? <span class="muted">+{items.length - 80} more…</span> : null}
+                        </div>
+                ) : <div class="muted">None.</div>}
+            </div>
+
+            <div class="card">
+                <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">Units with this stat</h2>
+                {units.length ? (
+                        <div class="toolbar">
+                            {units.slice(0, 80).map((u) => (
+                                    <a class="pill" href={url(`units/${encodeURIComponent(u.id)}/`)}>
+                                        <code>{u.id}</code>
+                                        {u.lvl != null ? <> <span class="muted">(lvl {u.lvl}{u.maxLvl != null ? `-${u.maxLvl}` : ""})</span></> : null}
+                                    </a>
+                            ))}
+                            {units.length > 80 ? <span class="muted">+{units.length - 80} more…</span> : null}
+                        </div>
+                ) : <div class="muted">None.</div>}
+            </div>
+        </div>
+    </div>
+</BaseLayout>

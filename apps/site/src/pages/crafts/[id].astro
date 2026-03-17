@@ -1,0 +1,135 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { url, icon } from "../../lib/urls";
+import { readPublicJson, buildIndex } from "../../lib/data";
+
+export async function getStaticPaths() {
+    const crafts = await readPublicJson<any[]>("data/craft.json");
+    const items = await readPublicJson<any[]>("data/items.json");
+    const jobs = await readPublicJson<any[]>("data/jobs.json");
+
+    const itemById = buildIndex(items);
+    const jobById = buildIndex(jobs);
+
+    return crafts.map((c) => ({
+        params: { id: String(c.item) },
+        props: {
+            craft: c,
+            itemById: Object.fromEntries(itemById.entries()),
+            job: jobById.get(String(c.job)) ?? null,
+            unlockItemExists: c.unlockSource ? itemById.has(String(c.unlockSource)) : false,
+        },
+    }));
+}
+
+const { craft, itemById, job, unlockItemExists } = Astro.props;
+
+function itemObj(id) {
+    return itemById?.[id] ?? null;
+}
+function itemName(id) {
+    return itemObj(id)?.texts?.name ?? id;
+}
+function itemIcon(id) {
+    const it = itemObj(id);
+    return it?.gfx?.file ? icon(it.gfx.file) : null;
+}
+
+const outId = String(craft.item);
+const outName = itemName(outId);
+const outIcon = itemIcon(outId);
+---
+
+<BaseLayout title={`Craft: ${outName}`}>
+    <div class="card">
+        <div class="toolbar" style="justify-content: space-between; margin-bottom: 0.75rem;">
+            <a class="pill" href={url("crafts/")}>← Back to Crafts</a>
+            <span class="pill muted">Output: <code>{craft.item}</code></span>
+        </div>
+
+        <div class="hero" style="align-items:center;">
+            <div class="toolbar" style="gap: 1rem;">
+                {outIcon ? <img class="icon" src={outIcon} width="56" height="56" alt={outName} /> : null}
+                <div>
+                    <h1 style="margin:0 0 .25rem 0;" data-pagefind-meta="title">{outName}</h1>
+                    <div class="muted">
+                        Job: <a href={url(`jobs/${encodeURIComponent(String(craft.job))}/`)}><code>{craft.job}</code></a>
+                        {" "}• Level <code>{craft.level}</code>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div style="display:grid; gap:.75rem; margin-top: 1rem;">
+            <div class="card">
+                <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">Output item</h2>
+                <span class="item-chip tip" data-tip={outName}>
+          {outIcon ? <img src={outIcon} alt={outName} loading="lazy" decoding="async" /> : null}
+                    <a class="pill" href={url(`items/${encodeURIComponent(outId)}/`)}>{outName}</a>
+        </span>
+            </div>
+
+            <div class="card">
+                <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">Inputs</h2>
+                {craft.input?.length ? (
+                        <ul style="margin:0; padding-left:1.25rem;">
+                            {craft.input.map((x) => {
+                                const id = String(x.item);
+                                const nm = itemName(id);
+                                const ic = itemIcon(id);
+                                return (
+                                        <li style="margin-bottom:.35rem;">
+                                            <div class="drop-row">
+                                            <code>{x.count}</code> ×{" "}
+                                            <span class="item-chip tip" data-tip={nm}>
+                    {ic ? <img src={ic} alt={nm} loading="lazy" decoding="async" /> : null}
+                                                <a href={url(`items/${encodeURIComponent(id)}/`)}>{nm}</a>{" "}
+                                                <span class="muted">(<code>{id}</code>)</span>
+                  </span>
+                                            </div>
+                                        </li>
+                                );
+                            })}
+                        </ul>
+                ) : <div class="muted">No inputs.</div>}
+            </div>
+
+            <div class="card">
+                <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">Unlock / Loot</h2>
+
+                {craft.unlockSource ? (
+                        <div>
+                            Unlock source:{" "}
+                            {unlockItemExists ? (
+                                    <span class="item-chip tip" data-tip={itemName(String(craft.unlockSource))}>
+                {itemIcon(String(craft.unlockSource)) ? (
+                        <img src={itemIcon(String(craft.unlockSource))} alt={itemName(String(craft.unlockSource))} loading="lazy" decoding="async" />
+                ) : null}
+                                        <a href={url(`items/${encodeURIComponent(String(craft.unlockSource))}/`)}>
+                  <code>{craft.unlockSource}</code>
+                </a>
+              </span>
+                            ) : (
+                                    <code>{craft.unlockSource}</code>
+                            )}
+                        </div>
+                ) : (
+                        <div class="muted">No unlockSource.</div>
+                )}
+
+                {craft.loot ? (
+                        <div style="margin-top:.35rem;">
+                            Loot: <code>{craft.loot}</code>
+                        </div>
+                ) : null}
+            </div>
+
+            {job ? (
+                    <div class="card">
+                        <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">Job details</h2>
+                        <div class="muted">{job?.texts?.desc ?? "—"}</div>
+                    </div>
+            ) : null}
+        </div>
+    </div>
+</BaseLayout>

@@ -1,0 +1,19 @@
+{
+  "name": "farever-monolith",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @farever/site",
+    "build": "npm run build --workspace @farever/site",
+    "preview": "npm run preview --workspace @farever/site",
+    "extract:paks": "node packages/pipeline/src/cli.cjs extract-paks",
+    "dump:site": "node packages/pipeline/src/cli.cjs dump-site",
+    "export:models": "node packages/pipeline/src/cli.cjs export-models",
+    "stitch:maps": "node packages/pipeline/src/cli.cjs stitch-maps",
+    "sync:game": "node packages/pipeline/src/cli.cjs sync-game",
+    "clean": "node packages/pipeline/src/cli.cjs clean"
+  }
+}

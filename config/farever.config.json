@@ -1,0 +1,33 @@
+{
+  "pakDir": "./game-input/pak",
+  "extractDir": "./.cache/extracted",
+  "siteDir": "./apps/site",
+  "sitePublicDir": "./apps/site/public",
+  "siteGeneratedDir": "./apps/site/public/generated",
+  "siteModelLibraryDir": "./apps/site/public/generated/model-library",
+  "pakFiles": [
+    "res.pak",
+    "res.levels.pak",
+    "res.light.pak",
+    "res.map.pak"
+  ],
+  "modelRoots": [
+    "Character",
+    "Environment",
+    "Fx",
+    "Gameplay",
+    "Items",
+    "Level",
+    "UI"
+  ],
+  "maps": [
+    {
+      "id": "w1-siagarta",
+      "worldRootDir": "Level/World/W1_Siagarta.dat",
+      "minimapDir": "Level/World/W1_Siagarta.dat/minimap",
+      "worldPrefabPath": "Level/World/W1_Siagarta.prefab",
+      "publicDataDir": "data/maps/w1-siagarta",
+      "stitchOutputDir": ".cache/generated/maps/w1-siagarta"
+    }
+  ]
+}

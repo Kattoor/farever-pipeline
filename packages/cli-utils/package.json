@@ -1,0 +1,9 @@
+{
+  "name": "@farever/cli-utils",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.cjs",
+  "dependencies": {
+    "consola": "^3.4.2"
+  }
+}

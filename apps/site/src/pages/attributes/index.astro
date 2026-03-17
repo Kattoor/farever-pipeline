@@ -1,0 +1,23 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+---
+<BaseLayout title="Attributes">
+    <div class="card">
+        <div class="hero">
+            <div>
+                <h1 data-pagefind-meta="title">Attributes</h1>
+                <div class="muted">From <code>public/generated/data/attributes.json</code></div>
+            </div>
+            <div class="toolbar">
+                <input id="attr-search" type="search" placeholder="Search id / name…" />
+                <span id="attr-count" class="pill muted">Loading…</span>
+            </div>
+        </div>
+
+        <div id="attr-table"></div>
+    </div>
+
+    <script>
+        import "../../scripts/attributes-table";
+    </script>
+</BaseLayout>

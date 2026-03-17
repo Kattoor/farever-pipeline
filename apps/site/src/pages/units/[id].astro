@@ -1,0 +1,289 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { url, icon } from "../../lib/urls";
+import { readPublicJson, buildIndex, resolveLootIdForUnit, unitItemRefs } from "../../lib/data";
+
+function fmtRange(e) {
+    const parts = [];
+    if (e.minLvl != null || e.maxLvl != null) parts.push(`lvl ${e.minLvl ?? "?"}-${e.maxLvl ?? "?"}`);
+    if (e.itemMin != null || e.itemMax != null) parts.push(`qty ${e.itemMin ?? "?"}-${e.itemMax ?? "?"}`);
+    return parts.length ? `(${parts.join(", ")})` : "";
+}
+
+export async function getStaticPaths() {
+    const [units, items, lootTables, skills, attributes] = await Promise.all([
+        readPublicJson<any[]>("data/units.json"),
+        readPublicJson<any[]>("data/items.json"),
+        readPublicJson<any[]>("data/loot-tables.json"),
+        readPublicJson<any[]>("data/skills.json"),
+        readPublicJson<any[]>("data/attributes.json"),
+    ]);
+
+    const itemById = buildIndex(items);
+    const lootById = buildIndex(lootTables);
+    const skillById = buildIndex(skills);
+    const attrById = buildIndex(attributes);
+    const unitById = buildIndex(units);
+
+    return units.map((unit) => {
+        const lootId = resolveLootIdForUnit(unit, lootById);
+        const lootTable = lootId ? lootById.get(lootId) : null;
+
+        const itemRefs = unitItemRefs(unit).filter((x) => itemById.has(x));
+
+        const resolvedSkills = (unit?.skills ?? [])
+            .map((s) => {
+                const id = s?.skill ? String(s.skill) : null;
+                if (!id) return null;
+                return { ...s, id, skillObj: skillById.get(id) ?? null };
+            })
+            .filter(Boolean);
+
+        const resolvedStats = (unit?.stats ?? []).map((st) => {
+            const id = st?.attribute ? String(st.attribute) : null;
+            return { ...st, attrId: id, attrObj: id ? attrById.get(id) ?? null : null };
+        });
+
+        const inheritRefs = (unit?.inherit ?? []).map((x) => String(x.ref ?? x)).filter(Boolean);
+        const inheritObjs = inheritRefs.map((rid) => ({ id: rid, unit: unitById.get(rid) ?? null }));
+
+        const varsJson = unit?.vars && Object.keys(unit.vars).length ? JSON.stringify(unit.vars, null, 2) : "";
+        const scriptText = (unit?.script ?? "").trim();
+
+        return {
+            params: { id: String(unit.id) },
+            props: {
+                unit,
+                lootId,
+                lootTable,
+                itemRefs,
+                resolvedSkills,
+                resolvedStats,
+                inheritObjs,
+                itemById: Object.fromEntries(itemById.entries()),
+                varsJson,
+                scriptText,
+            },
+        };
+    });
+}
+
+const { unit, lootId, lootTable, itemRefs, resolvedSkills, resolvedStats, inheritObjs, itemById, varsJson, scriptText } = Astro.props;
+
+const name = unit?.texts?.name ?? unit?.name ?? unit.id;
+const unitIcon =
+    unit?.gfx?.file ? icon(unit.gfx.file) :
+        (unit?.icon ? icon(unit.icon) : null);
+
+function itemObj(id) {
+    return itemById?.[id] ?? null;
+}
+function itemName(id) {
+    return itemObj(id)?.texts?.name ?? id;
+}
+function itemIcon(id) {
+    const it = itemObj(id);
+    return it?.gfx?.file ? icon(it.gfx.file) : null;
+}
+
+const parts = unit?.parts ?? {};
+const gear = parts?.gear ?? [];
+const weapons = parts?.weapons ?? [];
+const defense = parts?.defense ?? null;
+const body = parts?.body ?? null;
+---
+
+<BaseLayout title={`Unit: ${name}`}>
+    <div class="card">
+        <div class="toolbar" style="justify-content: space-between; margin-bottom: 0.75rem;">
+            <a class="pill" href={url("units/")}>← Back to Units</a>
+            <span class="pill muted">ID: <code>{unit.id}</code></span>
+        </div>
+
+        <div class="hero" style="align-items:center;">
+            <div class="toolbar" style="gap: 1rem;">
+                {unitIcon ? <img class="icon" src={unitIcon} width="56" height="56" alt={name} /> : null}
+                <div>
+                    <h1 style="margin:0;" data-pagefind-meta="title">{name}</h1>
+                    <div class="muted">
+                        type <code>{unit.type ?? "—"}</code>
+                        {unit.lvl != null ? <> • lvl <code>{unit.lvl}</code></> : null}
+                        {unit.maxLvl != null ? <>–<code>{unit.maxLvl}</code></> : null}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {unit?.texts?.desc ? <p style="white-space: pre-line;">{unit.texts.desc}</p> : null}
+
+        <div style="display:grid; gap: .75rem; margin-top: 1rem;">
+            <div class="card">
+                <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">Parts</h2>
+
+                <div style="display:grid; gap:.6rem;">
+                    <div>
+                        <div class="muted" style="margin-bottom:.25rem;">Gear</div>
+                        {gear.length ? (
+                                <div class="toolbar">
+                                    {gear.map((g) => {
+                                        const id = String(g.ref ?? g);
+                                        const nm = itemName(id);
+                                        const ic = itemIcon(id);
+                                        return (
+                                                <span class="item-chip tip" data-tip={nm}>
+                      {ic ? <img src={ic} alt={nm} loading="lazy" decoding="async" /> : null}
+                                                    <a href={url(`items/${encodeURIComponent(id)}/`)}>{nm}</a>
+                    </span>
+                                        );
+                                    })}
+                                </div>
+                        ) : <div class="muted">—</div>}
+                    </div>
+
+                    <div>
+                        <div class="muted" style="margin-bottom:.25rem;">Weapons</div>
+                        {weapons.length ? (
+                                <div class="toolbar">
+                                    {weapons.map((w) => {
+                                        const id = String(w.ref ?? w);
+                                        const nm = itemName(id);
+                                        const ic = itemIcon(id);
+                                        return (
+                                                <span class="item-chip tip" data-tip={nm}>
+                      {ic ? <img src={ic} alt={nm} loading="lazy" decoding="async" /> : null}
+                                                    <a href={url(`items/${encodeURIComponent(id)}/`)}>{nm}</a>
+                    </span>
+                                        );
+                                    })}
+                                </div>
+                        ) : <div class="muted">—</div>}
+                    </div>
+
+                    <div>
+                        <div class="muted" style="margin-bottom:.25rem;">Defense</div>
+                        {defense ? (
+                            (() => {
+                                const id = String(defense);
+                                const nm = itemName(id);
+                                const ic = itemIcon(id);
+                                return (
+                                        <span class="item-chip tip" data-tip={nm}>
+                    {ic ? <img src={ic} alt={nm} loading="lazy" decoding="async" /> : null}
+                                            <a href={url(`items/${encodeURIComponent(id)}/`)}>{nm}</a>
+                  </span>
+                                );
+                            })()
+                        ) : <div class="muted">—</div>}
+                    </div>
+
+                    <div>
+                        <div class="muted" style="margin-bottom:.25rem;">Body</div>
+                        {body ? <pre style="margin:0; overflow:auto;">{JSON.stringify(body, null, 2)}</pre> : <div class="muted">—</div>}
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">Skills</h2>
+                {resolvedSkills.length ? (
+                        <ul style="margin:0; padding-left:1.25rem;">
+                            {resolvedSkills.map((s) => (
+                                    <li>
+                                        <a href={url(`skills/${encodeURIComponent(s.id)}/`)}><code>{s.id}</code></a>
+                                        {s.level != null ? <> <span class="muted">(req lvl <code>{s.level}</code>)</span></> : null}
+                                        {s.skillObj?.texts?.name ? <> — {s.skillObj.texts.name}</> : null}
+                                    </li>
+                            ))}
+                        </ul>
+                ) : <div class="muted">None.</div>}
+            </div>
+
+            <div class="card">
+                <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">Stats / Attributes</h2>
+                {resolvedStats.length ? (
+                        <ul style="margin:0; padding-left:1.25rem;">
+                            {resolvedStats.map((st) => (
+                                    <li>
+                                        {st.attrId ? (
+                                                <a href={url(`attributes/${encodeURIComponent(st.attrId)}/`)}>
+                                                    <code>{st.attrId}</code>
+                                                </a>
+                                        ) : <span class="muted">—</span>}
+                                        {st.value != null ? <> = <code>{st.value}</code></> : null}
+                                        {st.multiplier != null ? <> × <code>{st.multiplier}</code></> : null}
+                                    </li>
+                            ))}
+                        </ul>
+                ) : <div class="muted">None.</div>}
+            </div>
+
+            <div class="card">
+                <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">Inherit</h2>
+                {inheritObjs.length ? (
+                        <div class="toolbar">
+                            {inheritObjs.map((x) => (
+                                    <a class="pill" href={url(`units/${encodeURIComponent(x.id)}/`)}>
+                                        <code>{x.id}</code>
+                                    </a>
+                            ))}
+                        </div>
+                ) : <div class="muted">—</div>}
+            </div>
+
+            <div class="card">
+                <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">Loot</h2>
+                {lootTable ? (
+                        <>
+                            <div class="muted" style="margin-bottom:.5rem;">
+                                Loot table: <a href={url(`loot-tables/${encodeURIComponent(lootId)}/`)}><code>{lootId}</code></a>
+                                {" "}• entries: <code>{lootTable.loot?.length ?? 0}</code>
+                            </div>
+
+                            <ul style="margin:0; padding-left:1.25rem;">
+                                {lootTable.loot?.map((e) => (
+                                        <li style="margin-bottom:.35rem;">
+                                            <code>{e.proba}</code>{" "}
+                                            {e.item ? (() => {
+                                                const id = String(e.item);
+                                                const nm = itemName(id);
+                                                const ic = itemIcon(id);
+                                                return (
+                                                        <span class="item-chip tip" data-tip={nm}>
+                        {ic ? <img src={ic} alt={nm} loading="lazy" decoding="async" /> : null}
+                                                            item{" "}
+                                                            <a href={url(`items/${encodeURIComponent(id)}/`)}>
+                          <code>{id}</code>
+                        </a>{" "}
+                                                            <span class="muted">{fmtRange(e)}</span>
+                      </span>
+                                                );
+                                            })() : e.lootTable ? (
+                                                    <>includes table <a href={url(`loot-tables/${encodeURIComponent(String(e.lootTable))}/`)}><code>{e.lootTable}</code></a> <span class="muted">{fmtRange(e)}</span></>
+                                            ) : (
+                                                    <span class="muted">—</span>
+                                            )}
+                                        </li>
+                                ))}
+                            </ul>
+                        </>
+                ) : (
+                        <div class="muted">No matching loot table found.</div>
+                )}
+            </div>
+
+            {varsJson ? (
+                    <div class="card">
+                        <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">vars</h2>
+                        <pre style="margin:0; overflow:auto;">{varsJson}</pre>
+                    </div>
+            ) : null}
+
+            {scriptText ? (
+                    <div class="card">
+                        <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">script</h2>
+                        <pre style="margin:0; overflow:auto; white-space: pre;">{scriptText}</pre>
+                    </div>
+            ) : null}
+        </div>
+    </div>
+</BaseLayout>

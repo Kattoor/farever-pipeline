@@ -1,0 +1,21 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+---
+<BaseLayout title="Loot Tables">
+    <div class="card">
+        <div class="hero">
+            <div>
+                <h1 data-pagefind-meta="title">Loot Tables</h1>
+                <div class="muted">From <code>public/generated/data/loot-tables.json</code></div>
+            </div>
+            <div class="toolbar">
+                <input id="loot-search" type="search" placeholder="Search loot table id…" />
+                <span id="loot-count" class="pill muted">Loading…</span>
+            </div>
+        </div>
+        <div id="loot-table"></div>
+    </div>
+    <script>
+        import "../../scripts/loot-tables-table";
+    </script>
+</BaseLayout>

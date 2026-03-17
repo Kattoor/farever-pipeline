@@ -1,0 +1,21 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+---
+<BaseLayout title="Jobs">
+    <div class="card">
+        <div class="hero">
+            <div>
+                <h1 data-pagefind-meta="title">Jobs</h1>
+                <div class="muted">From <code>public/generated/data/jobs.json</code></div>
+            </div>
+            <div class="toolbar">
+                <input id="j-search" type="search" placeholder="Search id / name…" />
+                <span id="j-count" class="pill muted">Loading…</span>
+            </div>
+        </div>
+        <div id="j-table"></div>
+    </div>
+    <script>
+        import "../../scripts/jobs-table";
+    </script>
+</BaseLayout>

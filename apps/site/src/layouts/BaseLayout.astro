@@ -1,0 +1,46 @@
+---
+import "../styles/global.css";
+import { url } from "../lib/urls";
+
+const { title = "Game DB", wide = false } = Astro.props;
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{title}</title>
+</head>
+<body>
+<div class:list={["container", wide && "container-wide"]}>
+  <header class="header">
+    <div class="brand">
+      <span class="pill">🧩 Data</span>
+      <span>Game DB</span>
+    </div>
+
+    <nav class="nav">
+      <a href={url("items/")}>Items</a>
+      <a href={url("units/")}>Units</a>
+      <a href={url("loot-tables/")}>Loot Tables</a>
+      <a href={url("gatherables/")}>Gatherables</a>
+      <a href={url("crafts/")}>Crafts</a>
+      <a href={url("jobs/")}>Jobs</a>
+      <a href={url("skills/")}>Skills</a>
+      <a href={url("attributes/")}>Attributes</a>
+      <a href={url("map/")}>Map</a>
+      <a href={url("models/")}>Models</a>
+      <a href={url("search/")}>Search</a>
+    </nav>
+  </header>
+
+  <main data-pagefind-body>
+    <slot />
+  </main>
+
+  <footer class="muted" style="margin: 1.25rem 0 0.5rem 0; font-size: 0.9rem;">
+    Static site (Astro) • Tables (Tabulator) • Search (Pagefind)
+  </footer>
+</div>
+</body>
+</html>

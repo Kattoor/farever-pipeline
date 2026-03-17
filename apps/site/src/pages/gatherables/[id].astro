@@ -1,0 +1,99 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { url, icon } from "../../lib/urls";
+import { readPublicJson, buildIndex, extractBracketRefs } from "../../lib/data";
+
+export async function getStaticPaths() {
+    const gatherables = await readPublicJson<any[]>("data/gatherable.json");
+    const items = await readPublicJson<any[]>("data/items.json");
+    const lootTables = await readPublicJson<any[]>("data/loot-tables.json");
+
+    const itemById = buildIndex(items);
+    const lootById = buildIndex(lootTables);
+
+    return gatherables.map((g) => {
+        const refs = extractBracketRefs(g?.texts?.desc).filter((x) => itemById.has(x));
+        const hitLoot = g?.hitLoot ? String(g.hitLoot) : null;
+        const lootTable = hitLoot && lootById.has(hitLoot) ? lootById.get(hitLoot) : null;
+
+        return {
+            params: { id: String(g.id) },
+            props: {
+                g,
+                refs,
+                hitLoot,
+                lootTable,
+                itemById: Object.fromEntries(itemById.entries()),
+            },
+        };
+    });
+}
+
+const { g, refs, hitLoot, lootTable, itemById } = Astro.props;
+const name = g?.texts?.name ?? g.id;
+
+function itemObj(id) {
+    return itemById?.[id] ?? null;
+}
+function itemName(id) {
+    return itemObj(id)?.texts?.name ?? id;
+}
+function itemIcon(id) {
+    const it = itemObj(id);
+    return it?.gfx?.file ? icon(it.gfx.file) : null;
+}
+---
+
+<BaseLayout title={`Gatherable: ${name}`}>
+    <div class="card">
+        <div class="toolbar" style="justify-content: space-between; margin-bottom: 0.75rem;">
+            <a class="pill" href={url("gatherables/")}>← Back to Gatherables</a>
+            <span class="pill muted">ID: <code>{g.id}</code></span>
+        </div>
+
+        <h1 style="margin:0 0 .25rem 0;" data-pagefind-meta="title">{name}</h1>
+        <div class="muted">
+            Tool: <code>{g.requiredTool ?? "—"}</code>
+            {" "}• Type: <code>{g?.texts?.type ?? "—"}</code>
+        </div>
+
+        {g?.texts?.desc ? <p style="white-space: pre-line;">{g.texts.desc}</p> : null}
+
+        <div style="display:grid; gap:.75rem; margin-top: 1rem;">
+            <div class="card">
+                <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">Hit loot table</h2>
+                {hitLoot ? (
+                    lootTable ? (
+                            <div>
+                                <a class="pill" href={url(`loot-tables/${encodeURIComponent(hitLoot)}/`)}><code>{hitLoot}</code></a>
+                                <div class="muted" style="margin-top:.5rem;">Entries: <code>{lootTable.loot?.length ?? 0}</code></div>
+                            </div>
+                    ) : <div class="muted">Has hitLoot <code>{hitLoot}</code>, but no matching loot table found.</div>
+                ) : <div class="muted">No hitLoot defined.</div>}
+            </div>
+
+            <div class="card">
+                <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">Items referenced in description</h2>
+                {refs.length ? (
+                        <ul style="margin:0; padding-left:1.25rem;">
+                            {refs.map((id) => {
+                                const nm = itemName(id);
+                                const ic = itemIcon(id);
+                                return (
+                                        <li style="margin-bottom:.35rem;">
+                                            <div class="drop-row">
+                  <span class="item-chip tip" data-tip={nm}>
+                    {ic ? <img src={ic} alt={nm} loading="lazy" decoding="async" /> : null}
+                      <a href={url(`items/${encodeURIComponent(id)}/`)}>{nm}</a>{" "}
+                      <span class="muted">(<code>{id}</code>)</span>
+                  </span>
+                                            </div>
+                                        </li>
+                                );
+                            })}
+                        </ul>
+                ) : <div class="muted">No resolvable <code>[ItemId]</code> refs found.</div>}
+            </div>
+        </div>
+    </div>
+</BaseLayout>

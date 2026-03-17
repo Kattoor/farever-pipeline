@@ -1,0 +1,13 @@
+{
+  "name": "@farever/pak-extractor",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/cli.cjs",
+  "dependencies": {
+    "@farever/cli-utils": "0.1.0"
+  },
+  "bin": {
+    "farever-pak-extractor": "./src/cli.cjs",
+    "farever-extract-known-paks": "./src/cli.cjs"
+  }
+}

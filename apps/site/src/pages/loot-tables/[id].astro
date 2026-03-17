@@ -1,0 +1,242 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { url, icon } from "../../lib/urls";
+import { readPublicJson, buildIndex, resolveLootIdForUnit } from "../../lib/data";
+
+function pct(p) {
+    const n = Number(p);
+    if (!Number.isFinite(n)) return "—";
+    // 1 decimal max
+    const v = Math.round(n * 1000) / 10;
+    return `${v}%`;
+}
+
+function fmtRange(e) {
+    const parts = [];
+    if (e.minLvl != null || e.maxLvl != null) parts.push(`lvl ${e.minLvl ?? "?"}-${e.maxLvl ?? "?"}`);
+    if (e.itemMin != null || e.itemMax != null) parts.push(`qty ${e.itemMin ?? "?"}-${e.itemMax ?? "?"}`);
+    return parts.length ? `(${parts.join(", ")})` : "";
+}
+
+export async function getStaticPaths() {
+    const lootTables = await readPublicJson<any[]>("data/loot-tables.json");
+    const units = await readPublicJson<any[]>("data/units.json");
+    const gatherables = await readPublicJson<any[]>("data/gatherable.json");
+    const items = await readPublicJson<any[]>("data/items.json");
+
+    const lootById = buildIndex(lootTables);
+    const itemById = buildIndex(items);
+
+    const unitsUsing = new Map<string, any[]>();
+    for (const u of units) {
+        const lootId = resolveLootIdForUnit(u, lootById);
+        if (!lootId) continue;
+        (unitsUsing.get(lootId) ?? unitsUsing.set(lootId, []).get(lootId)!).push({
+            id: String(u.id),
+            name: u?.texts?.name ?? null,
+            gfxFile: u?.gfx?.file ?? null,
+            type: u?.type ?? null,
+        });
+    }
+    for (const [k, arr] of unitsUsing) arr.sort((a, b) => (a.name ?? a.id).localeCompare(b.name ?? b.id));
+
+    const gatherablesUsing = new Map<string, any[]>();
+    for (const g of gatherables) {
+        if (!g?.hitLoot) continue;
+        const id = String(g.hitLoot);
+        (gatherablesUsing.get(id) ?? gatherablesUsing.set(id, []).get(id)!).push({
+            id: String(g.id),
+            name: g?.texts?.name ?? null,
+            requiredTool: g?.requiredTool ?? null,
+        });
+    }
+    for (const [k, arr] of gatherablesUsing) arr.sort((a, b) => (a.name ?? a.id).localeCompare(b.name ?? b.id));
+
+    const referencedBy = new Map<string, string[]>();
+    for (const t of lootTables) {
+        const from = String(t.id);
+        for (const e of t.loot ?? []) {
+            if (e?.lootTable) {
+                const to = String(e.lootTable);
+                (referencedBy.get(to) ?? referencedBy.set(to, []).get(to)!).push(from);
+            }
+        }
+    }
+    for (const [k, arr] of referencedBy) referencedBy.set(k, Array.from(new Set(arr)).sort());
+
+    return lootTables.map((t) => {
+        const loot = Array.isArray(t.loot) ? t.loot : [];
+        const directDrops = loot.filter((e) => e?.item);
+        const includedTables = loot.filter((e) => e?.lootTable);
+
+        return {
+            params: { id: String(t.id) },
+            props: {
+                lootTable: t,
+                directDrops,
+                includedTables,
+                referencedBy: referencedBy.get(String(t.id)) ?? [],
+                unitsUsing: unitsUsing.get(String(t.id)) ?? [],
+                gatherablesUsing: gatherablesUsing.get(String(t.id)) ?? [],
+                lootById: Object.fromEntries(lootById.entries()),
+                itemById: Object.fromEntries(itemById.entries()),
+            },
+        };
+    });
+}
+
+const { lootTable, directDrops, includedTables, referencedBy, unitsUsing, gatherablesUsing, lootById, itemById } = Astro.props;
+
+function summarizeTable(id) {
+    const t = lootById?.[id];
+    if (!t) return null;
+    const loot = Array.isArray(t.loot) ? t.loot : [];
+    let items = 0, subtables = 0;
+    for (const e of loot) {
+        if (e?.item) items++;
+        else if (e?.lootTable) subtables++;
+    }
+    return { total: loot.length, items, subtables };
+}
+
+function itemName(id) {
+    const it = itemById?.[id];
+    return it?.texts?.name ?? id;
+}
+
+function itemIcon(id) {
+    const it = itemById?.[id];
+    return it?.gfx?.file ? icon(it.gfx.file) : null;
+}
+---
+
+<BaseLayout title={`Loot Table: ${lootTable.id}`}>
+    <div class="card">
+        <div class="toolbar" style="justify-content: space-between; margin-bottom: 0.75rem;">
+            <a class="pill" href={url("loot-tables/")}>← Back to Loot Tables</a>
+            <span class="pill muted">ID: <code>{lootTable.id}</code></span>
+        </div>
+
+        <h1 style="margin:0 0 .5rem 0;" data-pagefind-meta="title">Loot Table: {lootTable.id}</h1>
+
+        <div class="muted" style="margin-bottom: 1rem;">
+            Entries: <code>{lootTable.loot?.length ?? 0}</code>
+            {" "}• Direct drops: <code>{directDrops.length}</code>
+            {" "}• Included tables: <code>{includedTables.length}</code>
+        </div>
+
+        <div style="display:grid; gap:.75rem;">
+            <div class="card">
+                <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">Included loot tables</h2>
+
+                {includedTables.length ? (
+                        <div style="display:grid; gap:.6rem;">
+                            {includedTables.map((e) => {
+                                const refId = String(e.lootTable);
+                                const sum = summarizeTable(refId);
+                                return (
+                                        <div class="card" style="padding:.75rem;">
+                                            <div class="toolbar" style="justify-content: space-between;">
+                                                <div>
+                                                    <div class="muted" style="font-size:.9rem;">Includes</div>
+                                                    <div style="font-weight:750;">
+                                                        <a href={url(`loot-tables/${encodeURIComponent(refId)}/`)}>
+                                                            <code>{refId}</code>
+                                                        </a>
+                                                        <span class="muted">
+                          {" "}• chance <code>{pct(e.proba)}</code> {fmtRange(e)}
+                        </span>
+                                                    </div>
+                                                </div>
+                                                {sum ? (
+                                                        <span class="pill muted">
+                        items <code>{sum.items}</code> • subtables <code>{sum.subtables}</code> • total <code>{sum.total}</code>
+                      </span>
+                                                ) : (
+                                                        <span class="pill muted">missing table</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                );
+                            })}
+                        </div>
+                ) : <div class="muted">None.</div>}
+            </div>
+
+            <div class="card">
+                <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">Direct drops</h2>
+                {directDrops.length ? (
+                        <ul style="margin:0; padding-left:1.25rem;">
+                            {directDrops.map((e) => {
+                                const id = String(e.item);
+                                const nm = itemName(id);
+                                const ic = itemIcon(id);
+                                return (
+                                        <li style="margin-bottom: .4rem;">
+                                            <div class="drop-row">
+                  <span class="pill muted" style="margin-right:.5rem;">
+                    <code>{pct(e.proba)}</code>
+                  </span>
+
+                                            <span class="item-chip tip" data-tip={nm}>
+                    {ic ? <img src={ic} alt={nm} loading="lazy" decoding="async" /> : null}
+                                                <a href={url(`items/${encodeURIComponent(id)}/`)}>
+                      <code>{id}</code>
+                    </a>
+                  </span>{" "}
+                                            <span class="muted">{fmtRange(e)}</span>
+                                            </div>
+                                        </li>
+                                );
+                            })}
+                        </ul>
+                ) : <div class="muted">None.</div>}
+            </div>
+
+            <div class="card">
+                <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">Referenced by loot tables</h2>
+                {referencedBy.length ? (
+                        <div class="toolbar">
+                            {referencedBy.map((id) => (
+                                    <a class="pill" href={url(`loot-tables/${encodeURIComponent(id)}/`)}><code>{id}</code></a>
+                            ))}
+                        </div>
+                ) : <div class="muted">None.</div>}
+            </div>
+
+            <div class="card">
+                <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">Used by units</h2>
+                {unitsUsing.length ? (
+                        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap:.6rem;">
+                            {unitsUsing.map((u) => (
+                                    <a class="card" style="padding:.6rem; display:flex; gap:.6rem; align-items:center;" href={url(`units/${encodeURIComponent(u.id)}/`)}>
+                                        {u.gfxFile ? <img class="icon" src={icon(u.gfxFile)} width="32" height="32" alt={u.name ?? u.id} /> : null}
+                                        <div>
+                                            <div style="font-weight:700;">{u.name ?? u.id}</div>
+                                            <div class="muted" style="font-size:.9rem;"><code>{u.id}</code>{u.type ? <> • <code>{u.type}</code></> : null}</div>
+                                        </div>
+                                    </a>
+                            ))}
+                        </div>
+                ) : <div class="muted">None.</div>}
+            </div>
+
+            <div class="card">
+                <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">Used by gatherables (hitLoot)</h2>
+                {gatherablesUsing.length ? (
+                        <ul style="margin:0; padding-left:1.25rem;">
+                            {gatherablesUsing.map((g) => (
+                                    <li>
+                                        <div class="drop-row">
+                                        <a href={url(`gatherables/${encodeURIComponent(g.id)}/`)}><code>{g.id}</code></a>
+                                        {g.name ? <> — {g.name}</> : null}
+                                        {g.requiredTool ? <> <span class="muted">(tool <code>{g.requiredTool}</code>)</span></> : null}
+                                        </div>
+                                    </li>
+                            ))}
+                        </ul>
+                ) : <div class="muted">None.</div>}
+            </div>
+        </div>
+    </div>
+</BaseLayout>

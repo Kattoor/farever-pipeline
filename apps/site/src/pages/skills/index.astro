@@ -1,0 +1,23 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+---
+<BaseLayout title="Skills">
+    <div class="card">
+        <div class="hero">
+            <div>
+                <h1 data-pagefind-meta="title">Skills</h1>
+                <div class="muted">From <code>public/generated/data/skills.json</code></div>
+            </div>
+            <div class="toolbar">
+                <input id="skills-search" type="search" placeholder="Search id / name…" />
+                <span id="skills-count" class="pill muted">Loading…</span>
+            </div>
+        </div>
+
+        <div id="skills-table"></div>
+    </div>
+
+    <script>
+        import "../../scripts/skills-table";
+    </script>
+</BaseLayout>

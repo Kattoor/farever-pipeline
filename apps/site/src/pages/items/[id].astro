@@ -1,0 +1,179 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { url, icon } from "../../lib/urls";
+import { readPublicJson, buildIndex, unitItemRefs, extractBracketRefs } from "../../lib/data";
+
+export async function getStaticPaths() {
+    const items = await readPublicJson<any[]>("data/items.json");
+    const units = await readPublicJson<any[]>("data/units.json");
+    const lootTables = await readPublicJson<any[]>("data/loot-tables.json");
+    const gatherables = await readPublicJson<any[]>("data/gatherable.json");
+    const crafts = await readPublicJson<any[]>("data/craft.json");
+
+    const itemById = buildIndex(items);
+
+    const droppedBy = new Map<string, Set<string>>();
+    for (const lt of lootTables) {
+        for (const e of lt.loot ?? []) {
+            if (e?.item) {
+                const k = String(e.item);
+                if (!droppedBy.has(k)) droppedBy.set(k, new Set());
+                droppedBy.get(k)!.add(String(lt.id));
+            }
+        }
+    }
+
+    const usedByUnits = new Map<string, Set<string>>();
+    for (const u of units) {
+        for (const ref of unitItemRefs(u)) {
+            if (!usedByUnits.has(ref)) usedByUnits.set(ref, new Set());
+            usedByUnits.get(ref)!.add(String(u.id));
+        }
+    }
+
+    const gatheredFrom = new Map<string, Set<string>>();
+    for (const g of gatherables) {
+        const refs = extractBracketRefs(g?.texts?.desc);
+        for (const r of refs) {
+            if (!gatheredFrom.has(r)) gatheredFrom.set(r, new Set());
+            gatheredFrom.get(r)!.add(String(g.id));
+        }
+    }
+
+    const producedByCraft = new Map<string, any[]>();
+    const usedInCraft = new Map<string, any[]>();
+    for (const c of crafts) {
+        const out = String(c.item);
+        (producedByCraft.get(out) ?? producedByCraft.set(out, []).get(out)!).push(c);
+        for (const inp of c.input ?? []) {
+            const inId = String(inp.item);
+            (usedInCraft.get(inId) ?? usedInCraft.set(inId, []).get(inId)!).push(c);
+        }
+    }
+
+    return items
+        .filter((it) => typeof it?.id === "string" && it.id.trim().length > 0)
+        .map((it) => {
+            const id = String(it.id);
+            return {
+                params: { id },
+                props: {
+                    item: it,
+                    droppedBy: Array.from(droppedBy.get(id) ?? []),
+                    usedByUnits: Array.from(usedByUnits.get(id) ?? []),
+                    gatheredFrom: Array.from(gatheredFrom.get(id) ?? []),
+                    producedByCraft: producedByCraft.get(id) ?? [],
+                    usedInCraft: usedInCraft.get(id) ?? [],
+                    itemById: Object.fromEntries(itemById.entries()),
+                },
+            };
+        });
+}
+
+const { item, droppedBy, usedByUnits, gatheredFrom, producedByCraft, usedInCraft, itemById } = Astro.props;
+const name = item?.texts?.name ?? item.id;
+
+const iconUrl = icon(item?.gfx?.file ?? null);
+
+function itemLabel(id) {
+    const it = itemById?.[id];
+    return it?.texts?.name ?? id;
+}
+---
+
+<BaseLayout title={`Item: ${name}`}>
+    <div class="card">
+        <div class="toolbar" style="justify-content: space-between; margin-bottom: 0.75rem;">
+            <a class="pill" href={url("items/")}>← Back to Items</a>
+            <span class="pill muted">ID: <code>{item.id}</code></span>
+        </div>
+
+        <div class="hero" style="align-items:center;">
+            <div class="toolbar" style="gap: 1rem;">
+                {iconUrl ? <img class="icon" src={iconUrl} width="56" height="56" alt={name} /> : null}
+                <div>
+                    <h1 style="margin:0;" data-pagefind-meta="title">{name}</h1>
+                    <div class="muted">Type: <code>{item.type ?? "—"}</code> • Rarity: <code>{item.rarity ?? "—"}</code></div>
+                </div>
+            </div>
+        </div>
+
+        {item?.texts?.flavorDesc ? <p style="white-space: pre-line;">{item.texts.flavorDesc}</p> : null}
+        {item?.texts?.desc ? <p style="white-space: pre-line;">{item.texts.desc}</p> : null}
+
+        <div style="display:grid; gap: 0.75rem; margin-top: 1rem;">
+            <div class="card">
+                <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">Dropped by loot tables</h2>
+                {droppedBy.length ? (
+                        <div class="toolbar">
+                            {droppedBy.map((lt) => (
+                                    <a class="pill" href={url(`loot-tables/${encodeURIComponent(lt)}/`)}><code>{lt}</code></a>
+                            ))}
+                        </div>
+                ) : <div class="muted">None found.</div>}
+            </div>
+
+            <div class="card">
+                <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">Used by units</h2>
+                {usedByUnits.length ? (
+                        <div class="toolbar">
+                            {usedByUnits.slice(0, 30).map((u) => (
+                                    <a class="pill" href={url(`units/${encodeURIComponent(u)}/`)}><code>{u}</code></a>
+                            ))}
+                            {usedByUnits.length > 30 ? <span class="muted">+{usedByUnits.length - 30} more</span> : null}
+                        </div>
+                ) : <div class="muted">None found.</div>}
+            </div>
+
+            <div class="card">
+                <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">Gathered from</h2>
+                {gatheredFrom.length ? (
+                        <div class="toolbar">
+                            {gatheredFrom.map((g) => (
+                                    <a class="pill" href={url(`gatherables/${encodeURIComponent(g)}/`)}><code>{g}</code></a>
+                            ))}
+                        </div>
+                ) : <div class="muted">None found.</div>}
+            </div>
+
+            <div class="card">
+                <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">Crafting</h2>
+
+                <div style="display:grid; gap:.6rem;">
+                    <div>
+                        <div class="muted" style="margin-bottom:.25rem;">Produced by</div>
+                        {producedByCraft.length ? (
+                                <ul style="margin:0; padding-left:1.25rem;">
+                                    {producedByCraft.map((c) => (
+                                            <li>
+                                                <div class="drop-row">
+                                                <a href={url(`crafts/${encodeURIComponent(String(c.item))}/`)}><code>{c.job}</code> craft</a>
+                                                {" "}• level <code>{c.level}</code>
+                                                </div>
+                                            </li>
+                                    ))}
+                                </ul>
+                        ) : <div class="muted">Not craftable.</div>}
+                    </div>
+
+                    <div>
+                        <div class="muted" style="margin-bottom:.25rem;">Used as ingredient in</div>
+                        {usedInCraft.length ? (
+                                <ul style="margin:0; padding-left:1.25rem;">
+                                    {usedInCraft.slice(0, 40).map((c) => (
+                                            <li>
+                                                <div class="drop-row">
+                                                <a href={url(`crafts/${encodeURIComponent(String(c.item))}/`)}>{itemLabel(String(c.item))}</a>
+                                                {" "}({c.job}, lvl {c.level})
+                                                </div>
+                                            </li>
+                                    ))}
+                                    {usedInCraft.length > 40 ? <li class="muted"><div class="drop-row">+{usedInCraft.length - 40} more…</div></li> : null}
+                                </ul>
+                        ) : <div class="muted">Not used as an ingredient.</div>}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</BaseLayout>

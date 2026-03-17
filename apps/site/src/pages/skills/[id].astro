@@ -1,0 +1,377 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { url, icon } from "../../lib/urls";
+import { readPublicJson, buildIndex } from "../../lib/data";
+
+/* -----------------------
+   Rendering helpers (page runtime)
+------------------------ */
+function escapeHtml(s) {
+    return String(s ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+// [Attr] or ::var:: or ::var%::
+function splitRichTokensRender(text) {
+    if (!text) return [{ t: "text", v: "" }];
+    const re = /\[([^\]]+)\]|::([a-zA-Z0-9_]+)(%?)::/g;
+    const out = [];
+    let last = 0;
+    let m;
+    while ((m = re.exec(text))) {
+        if (m.index > last) out.push({ t: "text", v: text.slice(last, m.index) });
+        if (m[1]) out.push({ t: "br", v: m[1] });
+        else out.push({ t: "var", v: m[2], pct: m[3] === "%" });
+        last = m.index + m[0].length;
+    }
+    if (last < text.length) out.push({ t: "text", v: text.slice(last) });
+    return out;
+}
+
+function resolveVar(varsObj, key) {
+    if (!varsObj) return null;
+
+    if (Object.prototype.hasOwnProperty.call(varsObj, key)) return varsObj[key];
+
+    if (key.startsWith("ref_")) {
+        const k2 = key.slice(4);
+        if (Object.prototype.hasOwnProperty.call(varsObj, k2)) return varsObj[k2];
+    }
+
+    const alt = key.replace(/^ref_/, "");
+    if (Object.prototype.hasOwnProperty.call(varsObj, alt)) return varsObj[alt];
+
+    return null;
+}
+
+function formatResolvedVar(val, isPct) {
+    if (val == null) return null;
+
+    const n = typeof val === "number" ? val : Number(val);
+    if (Number.isFinite(n)) {
+        if (isPct) {
+            // 0..1 => 0..100%
+            if (n >= 0 && n <= 1) return `${Math.round(n * 1000) / 10}%`;
+            // 1..100 => already percent
+            if (n > 1 && n <= 100) return `${Math.round(n * 10) / 10}%`;
+            return `${n}%`;
+        }
+        return `${n}`;
+    }
+
+    return String(val);
+}
+
+function renderRichHtml(text, varsObj, attrIdSet) {
+    const parts = splitRichTokensRender(text);
+    let html = "";
+
+    for (const p of parts) {
+        if (p.t === "text") {
+            html += escapeHtml(p.v);
+            continue;
+        }
+
+        if (p.t === "br") {
+            const tok = String(p.v);
+            if (attrIdSet.has(tok)) {
+                html += `<a class="pill" style="padding:0.15rem 0.45rem; font-size:0.88rem;" href="${escapeHtml(
+                    url(`attributes/${encodeURIComponent(tok)}/`)
+                )}"><code>${escapeHtml(tok)}</code></a>`;
+            } else {
+                html += escapeHtml(`[${tok}]`);
+            }
+            continue;
+        }
+
+        // ::var:: / ::var%::
+        const key = String(p.v);
+        const resolved = resolveVar(varsObj, key);
+        const formatted = formatResolvedVar(resolved, !!p.pct);
+
+        if (formatted != null) {
+            const tip = `${key} = ${formatted}`;
+            html += `<span class="tip" data-tip="${escapeHtml(tip)}"><code>${escapeHtml(formatted)}</code></span>`;
+        } else {
+            html += escapeHtml(`::${key}${p.pct ? "%" : ""}::`);
+        }
+    }
+
+    return html;
+}
+
+/* -----------------------
+   getStaticPaths (build-time)
+   IMPORTANT: no dependency on helpers outside this function.
+------------------------ */
+export async function getStaticPaths() {
+    // Local tokenizer for build-time (no external scope dependencies)
+    function splitRichTokensBuild(text) {
+        if (!text) return [];
+        const re = /\[([^\]]+)\]|::([a-zA-Z0-9_]+)(%?)::/g;
+        const out = [];
+        let m;
+        while ((m = re.exec(text))) {
+            if (m[1]) out.push({ t: "br", v: m[1] });
+            else out.push({ t: "var", v: m[2], pct: m[3] === "%" });
+        }
+        return out;
+    }
+
+    function collectAffixAttributes(skill) {
+        const out = new Set();
+        for (const a of skill?.affixes ?? []) {
+            const atb = a?.target?.attribute;
+            if (atb) out.add(String(atb));
+        }
+        return Array.from(out);
+    }
+
+    function attrsMentionedInTextBuild(text, attrIdSet) {
+        const parts = splitRichTokensBuild(text);
+        const out = new Set();
+        for (const p of parts) {
+            if (p.t === "br") {
+                const tok = String(p.v);
+                if (attrIdSet.has(tok)) out.add(tok);
+            }
+        }
+        return out;
+    }
+
+    function extractSkillRefsFromText(text) {
+        if (!text) return [];
+        const out = new Set();
+        for (const m of text.matchAll(/\bSkill\.([A-Za-z0-9_]+)\b/g)) out.add(m[1]);
+        for (const m of text.matchAll(/["']([A-Za-z0-9_]{3,})["']/g)) out.add(m[1]);
+        return Array.from(out);
+    }
+
+    const [skills, units, items, attributes] = await Promise.all([
+        readPublicJson("data/skills.json"),
+        readPublicJson("data/units.json"),
+        readPublicJson("data/items.json"),
+        readPublicJson("data/attributes.json"),
+    ]);
+
+    const attrById = buildIndex(attributes);
+    const attrIdSet = new Set(Array.from(attrById.keys()));
+    const skillIdSet = new Set(skills.map((s) => String(s.id)));
+
+    // reverse: units -> skill
+    const unitsUsing = new Map();
+    for (const u of units) {
+        for (const s of u?.skills ?? []) {
+            const sid = s?.skill ? String(s.skill) : null;
+            if (!sid) continue;
+            (unitsUsing.get(sid) ?? unitsUsing.set(sid, []).get(sid)!).push({
+                id: String(u.id),
+                name: u?.texts?.name ?? u?.name ?? null,
+                lvl: u?.lvl ?? null,
+                maxLvl: u?.maxLvl ?? null,
+            });
+        }
+    }
+
+    // reverse: items -> skill
+    const itemsGranting = new Map();
+    for (const it of items) {
+        for (const s of it?.skills ?? []) {
+            const sid = s?.skill ? String(s.skill) : null;
+            if (!sid) continue;
+            (itemsGranting.get(sid) ?? itemsGranting.set(sid, []).get(sid)!).push({
+                id: String(it.id),
+                name: it?.texts?.name ?? null,
+            });
+        }
+    }
+
+    // reverse: props.status.ref
+    const usedAsStatusRefBy = new Map();
+    for (const sk of skills) {
+        const from = String(sk.id);
+        const ref = sk?.props?.status?.ref ? String(sk.props.status.ref) : null;
+        if (ref) (usedAsStatusRefBy.get(ref) ?? usedAsStatusRefBy.set(ref, []).get(ref)!).push(from);
+    }
+    for (const [k, arr] of usedAsStatusRefBy) {
+        usedAsStatusRefBy.set(k, Array.from(new Set(arr)).sort((a, b) => a.localeCompare(b)));
+    }
+
+    // reverse: script/text references
+    const referencedByScriptOrText = new Map();
+    for (const sk of skills) {
+        const from = String(sk.id);
+        const textsToScan = [];
+        if (typeof sk?.script === "string") textsToScan.push(sk.script);
+        if (typeof sk?.texts?.desc === "string") textsToScan.push(sk.texts.desc);
+        if (Array.isArray(sk?.mastery)) {
+            for (const m of sk.mastery) {
+                if (typeof m?.text?.desc === "string") textsToScan.push(m.text.desc);
+            }
+        }
+
+        const foundTargets = new Set();
+        for (const t of textsToScan) {
+            for (const cand of extractSkillRefsFromText(t)) {
+                if (skillIdSet.has(cand) && cand !== from) foundTargets.add(cand);
+            }
+        }
+
+        for (const target of foundTargets) {
+            if (!referencedByScriptOrText.has(target)) referencedByScriptOrText.set(target, new Set());
+            referencedByScriptOrText.get(target).add(from);
+        }
+    }
+
+    return skills.map((sk) => {
+        const id = String(sk.id);
+
+        const attrsFromAffixes = collectAffixAttributes(sk).filter((a) => attrById.has(a));
+
+        // attributes mentioned in skill desc + mastery desc
+        const mentioned = new Set();
+        if (typeof sk?.texts?.desc === "string") {
+            for (const a of attrsMentionedInTextBuild(sk.texts.desc, attrIdSet)) mentioned.add(a);
+        }
+        if (Array.isArray(sk?.mastery)) {
+            for (const m of sk.mastery) {
+                if (typeof m?.text?.desc === "string") {
+                    for (const a of attrsMentionedInTextBuild(m.text.desc, attrIdSet)) mentioned.add(a);
+                }
+            }
+        }
+
+        return {
+            params: { id },
+            props: {
+                skill: sk,
+                attrsFromAffixes,
+                attrsMentioned: Array.from(mentioned).sort((a, b) => a.localeCompare(b)),
+                unitsUsing: unitsUsing.get(id) ?? [],
+                itemsGranting: itemsGranting.get(id) ?? [],
+                usedAsStatusRefBy: usedAsStatusRefBy.get(id) ?? [],
+                referencedByScriptOrText: Array.from(referencedByScriptOrText.get(id) ?? []).sort((a, b) => a.localeCompare(b)),
+                attrIds: Array.from(attrIdSet),
+            },
+        };
+    });
+}
+
+const {
+    skill,
+    attrsFromAffixes,
+    attrsMentioned,
+    unitsUsing,
+    itemsGranting,
+    usedAsStatusRefBy,
+    referencedByScriptOrText,
+    attrIds
+} = Astro.props;
+
+const name = skill?.texts?.name ?? skill.id;
+const desc = skill?.texts?.desc ?? "";
+const flavor = skill?.texts?.flavorDesc ?? "";
+const iconUrl = skill?.gfx?.file ? icon(skill.gfx.file) : null;
+
+const varsObj = skill?.vars ?? {};
+const varsJson = varsObj && Object.keys(varsObj).length ? JSON.stringify(varsObj, null, 2) : "";
+const scriptText = (skill?.script ?? "").trim();
+
+const attrIdSet = new Set(attrIds);
+const descHtml = desc ? renderRichHtml(desc, varsObj, attrIdSet) : "";
+---
+
+<BaseLayout title={`Skill: ${name}`}>
+    <div class="card">
+        <div class="toolbar" style="justify-content: space-between; margin-bottom: 0.75rem;">
+            <a class="pill" href={url("skills/")}>← Back to Skills</a>
+            <span class="pill muted">ID: <code>{skill.id}</code></span>
+        </div>
+
+        <div class="hero" style="align-items:center;">
+            <div class="toolbar" style="gap: 1rem;">
+                {iconUrl ? <img class="icon" src={iconUrl} width="56" height="56" alt={name} /> : null}
+                <div>
+                    <h1 style="margin:0;" data-pagefind-meta="title">{name}</h1>
+                    <div class="muted">
+                        nature <code>{skill.nature ?? "—"}</code>
+                        {" "}• type <code>{skill.type ?? "—"}</code>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {descHtml ? <p style="white-space: pre-line;" set:html={descHtml} /> : null}
+        {flavor ? <p class="muted" style="white-space: pre-line;">{flavor}</p> : null}
+
+        <div style="display:grid; gap:.75rem; margin-top: 1rem;">
+            <div class="card">
+                <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">Attributes affected</h2>
+                {attrsFromAffixes.length ? (
+                        <div class="toolbar">
+                            {attrsFromAffixes.map((a) => (
+                                    <a class="pill" href={url(`attributes/${encodeURIComponent(a)}/`)}><code>{a}</code></a>
+                            ))}
+                        </div>
+                ) : <div class="muted">No attribute-affixes found.</div>}
+            </div>
+
+            <div class="card">
+                <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">Attributes mentioned in text</h2>
+                {attrsMentioned.length ? (
+                        <div class="toolbar">
+                            {attrsMentioned.map((a) => (
+                                    <a class="pill" href={url(`attributes/${encodeURIComponent(a)}/`)}><code>{a}</code></a>
+                            ))}
+                        </div>
+                ) : <div class="muted">None found in descriptions.</div>}
+            </div>
+
+            <div class="card">
+                <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">Referenced by other skills</h2>
+
+                {usedAsStatusRefBy.length ? (
+                        <div style="margin-bottom:.6rem;">
+                            <div class="muted" style="margin-bottom:.25rem;">Via <code>props.status.ref</code></div>
+                            <div class="toolbar">
+                                {usedAsStatusRefBy.map((sid) => (
+                                        <a class="pill" href={url(`skills/${encodeURIComponent(sid)}/`)}><code>{sid}</code></a>
+                                ))}
+                            </div>
+                        </div>
+                ) : null}
+
+                {referencedByScriptOrText.length ? (
+                        <div>
+                            <div class="muted" style="margin-bottom:.25rem;">Via <code>script</code> / description mentions</div>
+                            <div class="toolbar">
+                                {referencedByScriptOrText.map((sid) => (
+                                        <a class="pill" href={url(`skills/${encodeURIComponent(sid)}/`)}><code>{sid}</code></a>
+                                ))}
+                            </div>
+                        </div>
+                ) : (
+                    !usedAsStatusRefBy.length ? <div class="muted">No referencing skills found.</div> : null
+                )}
+            </div>
+
+            {varsJson ? (
+                    <div class="card">
+                        <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">vars</h2>
+                        <pre style="margin:0; overflow:auto;">{varsJson}</pre>
+                    </div>
+            ) : null}
+
+            {scriptText ? (
+                    <div class="card">
+                        <h2 style="margin:0 0 .5rem 0; font-size:1.1rem;">script</h2>
+                        <pre style="margin:0; overflow:auto; white-space: pre;">{scriptText}</pre>
+                    </div>
+            ) : null}
+        </div>
+    </div>
+</BaseLayout>

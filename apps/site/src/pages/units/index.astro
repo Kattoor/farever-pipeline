@@ -1,0 +1,21 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+---
+<BaseLayout title="Units">
+    <div class="card">
+        <div class="hero">
+            <div>
+                <h1 data-pagefind-meta="title">Units</h1>
+                <div class="muted">From <code>public/generated/data/units.json</code></div>
+            </div>
+            <div class="toolbar">
+                <input id="units-search" type="search" placeholder="Search id / name / type…" />
+                <span id="units-count" class="pill muted">Loading…</span>
+            </div>
+        </div>
+        <div id="units-table"></div>
+    </div>
+    <script>
+        import "../../scripts/units-table";
+    </script>
+</BaseLayout>
